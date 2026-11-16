@@ -6,6 +6,7 @@
 
 - 使用重心坐标判断像素是否位于三角形内
 - 使用重心坐标插值三角形顶点的深度和纹理坐标
+- 将三角形绕 Y 轴旋转并进行透视投影，展示距离带来的缩放与形变
 - 使用 Z 缓冲进行深度测试（深度值越小越靠近相机）
 - 使用捆绑的 `stb_image` 从 `assets/test.png` 加载纹理
 - 将渲染结果写入 ASCII PPM（P3）格式的 `triangle.ppm`
@@ -43,7 +44,9 @@ cmake --build build && ./build/renderStudy
 也可以不使用 CMake，直接编译所有源文件：
 
 ```bash
-c++ -std=c++17 -Iinclude -Ithird_party src/main.cpp src/Texture.cpp -o renderStudy
+c++ -std=c++17 -Iinclude -Ithird_party \
+  src/main.cpp src/Texture.cpp src/Projection.cpp src/Viewport.cpp \
+  -o renderStudy
 ./renderStudy
 ```
 
@@ -66,10 +69,16 @@ cmake -S . -B build
 │   └── test.png
 ├── include/
 │   ├── Color.h
-│   └── Texture.h
+│   ├── Projection.h
+│   ├── ScreenVertex.h
+│   ├── Texture.h
+│   ├── Vertex.h
+│   └── Viewport.h
 ├── src/
 │   ├── main.cpp
-│   └── Texture.cpp
+│   ├── Projection.cpp
+│   ├── Texture.cpp
+│   └── Viewport.cpp
 └── third_party/
     └── stb_image.h
 ```
