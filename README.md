@@ -1,15 +1,14 @@
 # MyRasterizer
 
-一个使用 C++17 编写的软件光栅化学习项目。程序将两个三角形光栅化到 800 × 600 的图像中，并输出为 PPM 图片。
+一个使用 C++17 编写的软件光栅化学习项目。程序将纹理映射到三角形上，进行深度测试，并输出为 PPM 图片。
 
 ## 当前功能
 
 - 使用重心坐标判断像素是否位于三角形内
-- 插值三角形顶点的深度和纹理坐标
+- 使用重心坐标插值三角形顶点的深度和纹理坐标
 - 使用 Z 缓冲进行深度测试（深度值越小越靠近相机）
-- 对纹理进行采样，并将结果写入 ASCII PPM（P3）格式的 `triangle.ppm`
-
-目前纹理由程序创建，所有纹理像素使用同一种颜色；尚未实现从图片文件加载纹理。
+- 使用捆绑的 `stb_image` 从 `assets/test.png` 加载纹理
+- 将渲染结果写入 ASCII PPM（P3）格式的 `triangle.ppm`
 
 ## 环境要求
 
@@ -37,12 +36,14 @@ cmake --build build
 cmake --build build && ./build/renderStudy
 ```
 
+请从项目根目录运行程序，这样它才能找到 `assets/test.png`。
+
 ## 直接编译
 
 也可以不使用 CMake，直接编译所有源文件：
 
 ```bash
-c++ -std=c++17 -Iinclude src/main.cpp src/Texture.cpp -o renderStudy
+c++ -std=c++17 -Iinclude -Ithird_party src/main.cpp src/Texture.cpp -o renderStudy
 ./renderStudy
 ```
 
@@ -61,10 +62,14 @@ cmake -S . -B build
 ├── .vscode/
 │   └── c_cpp_properties.json
 ├── CMakeLists.txt
+├── assets/
+│   └── test.png
 ├── include/
 │   ├── Color.h
 │   └── Texture.h
-└── src/
-    ├── main.cpp
-    └── Texture.cpp
+├── src/
+│   ├── main.cpp
+│   └── Texture.cpp
+└── third_party/
+    └── stb_image.h
 ```
