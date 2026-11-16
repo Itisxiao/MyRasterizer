@@ -39,6 +39,7 @@ bool insideTriangle(
     return !(hasNegative && hasPositive);
 }
 
+// 计算重心坐标
 bool barycentric(
     Point p,
     Point a,
@@ -54,6 +55,10 @@ bool barycentric(
         return false;
     }
 
+    //α 越大，P 越靠近 A。
+    // β 越大，P 越靠近 B。
+    // γ 越大，P 越靠近 C。
+    //面积比值法计算重心坐标
     alpha = edgeFunction(b, c, p) / area;
     beta  = edgeFunction(c, a, p) / area;
     gamma = edgeFunction(a, b, p) / area;
