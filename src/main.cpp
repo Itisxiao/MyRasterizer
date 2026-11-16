@@ -5,19 +5,19 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include "Texture.h"
+
 
 struct Point {
     float x;
     float y;
 };
 
-struct Color {
-    float r, g, b;
-};
-
 struct Vertex {
     float x, y;
     float z;
+
+    float u, v;
 
     float r, g, b;
 };
@@ -80,7 +80,8 @@ void drawTriangle(
     int width,
     int height,
     std::vector<int>& pixels,
-    std::vector<float>& zBuffer
+    std::vector<float>& zBuffer,
+    const Texture& texture
 ) {
     int minX = std::max(0, (int)std::floor(
         std::min({a.x, b.x, c.x})));
@@ -138,23 +139,35 @@ void drawTriangle(
                 // 3. 更新深度
                 zBuffer[index] = z;
 
-                // 4. 插值颜色
+                // 4. 插值得到当前像素的纹理坐标
+                float u = alpha * a.u
+                        + beta  * b.u
+                        + gamma * c.u;
+
+                float v = alpha * a.v
+                        + beta  * b.v
+                        + gamma * c.v;
+
+                // 5. 采样纹理颜色        
+                Color color = texture.sample(u, v);
+
+                // 6. 插值颜色
                 int r = (int)(
-                    alpha * a.r +
-                    beta  * b.r +
-                    gamma * c.r
+                    alpha * color.r +
+                    beta  * color.g +
+                    gamma * color.b
                 );
 
                 int g = (int)(
-                    alpha * a.g +
-                    beta  * b.g +
-                    gamma * c.g
+                    alpha * color.g +
+                    beta  * color.b +
+                    gamma * color.b
                 );
 
                 int bColor = (int)(
-                    alpha * a.b +
-                    beta  * b.b +
-                    gamma * c.b
+                    alpha * color.b +
+                    beta  * color.b +
+                    gamma * color.b
                 );
 
                 // 5. 更新颜色缓冲区
@@ -170,22 +183,29 @@ int main() {
     const int width = 800;
     const int height = 600;
 
+    int textureWidth = 256;
+    int textureHeight = 256;
+
+    Texture texture(textureWidth, textureHeight);
+
+    
+
     // 创建像素缓冲区，初始化为黑色
     std::vector<int> pixels(width * height * 3, 0);
 
     // 创建深度缓冲区，初始化为最大值
     std::vector<float> zBuffer(width * height, std::numeric_limits<float>::max());
 
-    Vertex a1 = {100, 100, 0.8f, 255, 0, 0};
-    Vertex b1 = {600, 100, 0.8f, 255, 0, 0};
-    Vertex c1 = {350, 500, 0.8f, 255, 0, 0};
+    Vertex a1 = {100, 100, 0.8f,0.0, 0.0, 255, 0, 0};
+    Vertex b1 = {600, 100, 0.8f,1.0, 0.0, 255, 0, 0};
+    Vertex c1 = {350, 500, 0.8f, 0.5, 1.0, 255, 0, 0};
 
-    Vertex a2 = {100, 100, 0.3f, 0, 0, 255};
-    Vertex b2 = {600, 100, 0.3f, 0, 0, 255};
-    Vertex c2 = {350, 500, 0.3f, 0, 0, 255};
-    
-    drawTriangle(a1, b1, c1, width, height, pixels, zBuffer);
-    drawTriangle(a2, b2, c2, width, height, pixels, zBuffer);
+    Vertex a2 = {100, 100, 0.9f, 0, 0, 255, 0, 0};
+    Vertex b2 = {600, 100, 0.9f, 0, 0, 255, 0, 0};
+    Vertex c2 = {350, 500, 0.9f, 0, 0, 255, 0, 0};
+
+    drawTriangle(a1, b1, c1, width, height, pixels, zBuffer, texture);
+    drawTriangle(a2, b2, c2, width, height, pixels, zBuffer, texture);
 
     //交换结果一样
     //drawTriangle(a2, b2, c2, width, height, pixels, zBuffer);
