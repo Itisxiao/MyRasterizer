@@ -9,7 +9,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_executable(renderStudy src/main.cpp  src/Texture.cpp)
 target_include_directories(renderStudy
-    PRIVATE include
+    PRIVATE include third_party
 )
 target_compile_features(renderStudy PRIVATE cxx_std_17)
 set_target_properties(renderStudy PROPERTIES CXX_EXTENSIONS OFF)

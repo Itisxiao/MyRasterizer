@@ -149,7 +149,7 @@ void drawTriangle(
                         + gamma * c.v;
 
                 // 5. 采样纹理颜色        
-                Color color = texture.sample(u, v);
+                 Color color = texture.sample(u, v);
 
                 //6.插值颜色更新颜色缓冲区
                 pixels[index * 3 + 0] = color.r;
@@ -167,7 +167,11 @@ int main() {
     int textureWidth = 256;
     int textureHeight = 256;
 
-    Texture texture(textureWidth, textureHeight);
+    //Texture texture(textureWidth, textureHeight);
+    Texture texture;
+     if (!texture.loadFromFile("assets/test.png")) {
+        return -1;
+    }
 
     
 
