@@ -10,6 +10,11 @@ struct Point {
     float y;
 };
 
+struct Color {
+    float r, g, b;
+};
+
+
 // 计算三角形的有向面积（叉积的两倍）
 float edgeFunction(Point a, Point b, Point p) {
     return (p.x - a.x) * (b.y - a.y)
@@ -32,6 +37,28 @@ bool insideTriangle(
     bool hasPositive = (w1 > 0 || w2 > 0 || w3 > 0);
 
     return !(hasNegative && hasPositive);
+}
+
+bool barycentric(
+    Point p,
+    Point a,
+    Point b,
+    Point c,
+    float& alpha,
+    float& beta,
+    float& gamma
+) {
+    float area = edgeFunction(a, b, c);
+
+    if (std::abs(area) < 1e-6f) {
+        return false;
+    }
+
+    alpha = edgeFunction(b, c, p) / area;
+    beta  = edgeFunction(c, a, p) / area;
+    gamma = edgeFunction(a, b, p) / area;
+
+    return alpha >= 0 && beta >= 0 && gamma >= 0;
 }
 
 int main() {
@@ -73,14 +100,27 @@ int main() {
                 y + 0.5f
             };
 
-            if (insideTriangle(p, a, b, c)) {
+            Color ca = {255, 0, 0};
+            Color cb = {0, 255, 0};
+            Color cc = {0, 0, 255};
 
-                // 设置为红色 RGB(255, 0, 0)
+            float alpha, beta, gamma;
+
+            if (barycentric(p, a, b, c, alpha, beta, gamma)) {
+
                 int index = (y * width + x) * 3;
 
-                pixels[index]     = 255;
-                pixels[index + 1] = 0;
-                pixels[index + 2] = 0;
+                pixels[index] = static_cast<int>(
+                    alpha * ca.r + beta * cb.r + gamma * cc.r
+                );
+
+                pixels[index + 1] = static_cast<int>(
+                    alpha * ca.g + beta * cb.g + gamma * cc.g
+                );
+
+                pixels[index + 2] = static_cast<int>(
+                    alpha * ca.b + beta * cb.b + gamma * cc.b
+                );
             }
         }
     }
