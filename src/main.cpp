@@ -4,6 +4,7 @@
 #include <vector>
 #include <algorithm>
 #include <cmath>
+#include <limits>
 
 struct Point {
     float x;
@@ -11,6 +12,13 @@ struct Point {
 };
 
 struct Color {
+    float r, g, b;
+};
+
+struct Vertex {
+    float x, y;
+    float z;
+
     float r, g, b;
 };
 
@@ -65,6 +73,98 @@ bool barycentric(
 
     return alpha >= 0 && beta >= 0 && gamma >= 0;
 }
+void drawTriangle(
+    const Vertex& a,
+    const Vertex& b,
+    const Vertex& c,
+    int width,
+    int height,
+    std::vector<int>& pixels,
+    std::vector<float>& zBuffer
+) {
+    int minX = std::max(0, (int)std::floor(
+        std::min({a.x, b.x, c.x})));
+
+    int maxX = std::min(width - 1, (int)std::ceil(
+        std::max({a.x, b.x, c.x})));
+
+    int minY = std::max(0, (int)std::floor(
+        std::min({a.y, b.y, c.y})));
+
+    int maxY = std::min(height - 1, (int)std::ceil(
+        std::max({a.y, b.y, c.y})));
+
+    float area = edgeFunction(
+        {a.x, a.y},
+        {b.x, b.y},
+        {c.x, c.y}
+    );
+
+    if (std::abs(area) < 1e-6f) {
+        return;
+    }
+
+    for (int y = minY; y <= maxY; y++) {
+        for (int x = minX; x <= maxX; x++) {
+
+            Point p = {
+                x + 0.5f,
+                y + 0.5f
+            };
+
+            float alpha, beta, gamma;
+
+            if (!barycentric(
+                p,
+                {a.x, a.y},
+                {b.x, b.y},
+                {c.x, c.y},
+                alpha, beta, gamma
+            )) {
+                continue;
+            }
+
+            // 1. 插值得到当前像素的深度
+            float z =
+                alpha * a.z +
+                beta  * b.z +
+                gamma * c.z;
+
+            int index = y * width + x;
+
+            // 2. 深度测试
+            if (z < zBuffer[index]) {
+
+                // 3. 更新深度
+                zBuffer[index] = z;
+
+                // 4. 插值颜色
+                int r = (int)(
+                    alpha * a.r +
+                    beta  * b.r +
+                    gamma * c.r
+                );
+
+                int g = (int)(
+                    alpha * a.g +
+                    beta  * b.g +
+                    gamma * c.g
+                );
+
+                int bColor = (int)(
+                    alpha * a.b +
+                    beta  * b.b +
+                    gamma * c.b
+                );
+
+                // 5. 更新颜色缓冲区
+                pixels[index * 3 + 0] = r;
+                pixels[index * 3 + 1] = g;
+                pixels[index * 3 + 2] = bColor;
+            }
+        }
+    }
+}
 
 int main() {
     const int width = 800;
@@ -73,62 +173,23 @@ int main() {
     // 创建像素缓冲区，初始化为黑色
     std::vector<int> pixels(width * height * 3, 0);
 
-    // 定义三角形的三个顶点
-    Point a = {400, 100};
-    Point b = {150, 450};
-    Point c = {650, 450};
+    // 创建深度缓冲区，初始化为最大值
+    std::vector<float> zBuffer(width * height, std::numeric_limits<float>::max());
 
-    // 计算三角形包围盒
-    int minX = std::max(0, (int)std::floor(
-        std::min({a.x, b.x, c.x})
-    ));
+    Vertex a1 = {100, 100, 0.8f, 255, 0, 0};
+    Vertex b1 = {600, 100, 0.8f, 255, 0, 0};
+    Vertex c1 = {350, 500, 0.8f, 255, 0, 0};
 
-    int maxX = std::min(width - 1, (int)std::ceil(
-        std::max({a.x, b.x, c.x})
-    ));
+    Vertex a2 = {100, 100, 0.3f, 0, 0, 255};
+    Vertex b2 = {600, 100, 0.3f, 0, 0, 255};
+    Vertex c2 = {350, 500, 0.3f, 0, 0, 255};
+    
+    drawTriangle(a1, b1, c1, width, height, pixels, zBuffer);
+    drawTriangle(a2, b2, c2, width, height, pixels, zBuffer);
 
-    int minY = std::max(0, (int)std::floor(
-        std::min({a.y, b.y, c.y})
-    ));
-
-    int maxY = std::min(height - 1, (int)std::ceil(
-        std::max({a.y, b.y, c.y})
-    ));
-
-    // 光栅化：遍历包围盒内的像素
-    for (int y = minY; y <= maxY; y++) {
-        for (int x = minX; x <= maxX; x++) {
-
-            // 使用像素中心点进行判断
-            Point p = {
-                x + 0.5f,
-                y + 0.5f
-            };
-
-            Color ca = {255, 0, 0};
-            Color cb = {0, 255, 0};
-            Color cc = {0, 0, 255};
-
-            float alpha, beta, gamma;
-
-            if (barycentric(p, a, b, c, alpha, beta, gamma)) {
-
-                int index = (y * width + x) * 3;
-
-                pixels[index] = static_cast<int>(
-                    alpha * ca.r + beta * cb.r + gamma * cc.r
-                );
-
-                pixels[index + 1] = static_cast<int>(
-                    alpha * ca.g + beta * cb.g + gamma * cc.g
-                );
-
-                pixels[index + 2] = static_cast<int>(
-                    alpha * ca.b + beta * cb.b + gamma * cc.b
-                );
-            }
-        }
-    }
+    //交换结果一样
+    //drawTriangle(a2, b2, c2, width, height, pixels, zBuffer);
+    //drawTriangle(a1, b1, c1, width, height, pixels, zBuffer);
 
     // 输出 PPM 图片
     std::ofstream file("triangle.ppm");
