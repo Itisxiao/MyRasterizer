@@ -151,29 +151,10 @@ void drawTriangle(
                 // 5. 采样纹理颜色        
                 Color color = texture.sample(u, v);
 
-                // 6. 插值颜色
-                int r = (int)(
-                    alpha * color.r +
-                    beta  * color.g +
-                    gamma * color.b
-                );
-
-                int g = (int)(
-                    alpha * color.g +
-                    beta  * color.b +
-                    gamma * color.b
-                );
-
-                int bColor = (int)(
-                    alpha * color.b +
-                    beta  * color.b +
-                    gamma * color.b
-                );
-
-                // 5. 更新颜色缓冲区
-                pixels[index * 3 + 0] = r;
-                pixels[index * 3 + 1] = g;
-                pixels[index * 3 + 2] = bColor;
+                //6.插值颜色更新颜色缓冲区
+                pixels[index * 3 + 0] = color.r;
+                pixels[index * 3 + 1] = color.g;
+                pixels[index * 3 + 2] = color.b;
             }
         }
     }
