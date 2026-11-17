@@ -73,20 +73,26 @@ bool barycentric(
     return alpha >= 0 && beta >= 0 && gamma >= 0;
 }
 
-Vertex rotateYAndTranslate(
+Vertex rotateAndTranslate(
     const Vertex& vertex,
-    float angle,
+    float rotationX,
+    float rotationY,
     float translateX,
     float translateY,
     float translateZ
 ) {
-    const float cosAngle = std::cos(angle);
-    const float sinAngle = std::sin(angle);
+    const float cosX = std::cos(rotationX);
+    const float sinX = std::sin(rotationX);
+    const float cosY = std::cos(rotationY);
+    const float sinY = std::sin(rotationY);
+
+    const float rotatedY = cosX * vertex.y - sinX * vertex.z;
+    const float rotatedZ = sinX * vertex.y + cosX * vertex.z;
 
     return {
-        cosAngle * vertex.x + sinAngle * vertex.z + translateX,
-        vertex.y + translateY,
-        -sinAngle * vertex.x + cosAngle * vertex.z + translateZ,
+        cosY * vertex.x + sinY * rotatedZ + translateX,
+        rotatedY + translateY,
+        -sinY * vertex.x + cosY * rotatedZ + translateZ,
         vertex.u,
         vertex.v
     };
@@ -187,7 +193,8 @@ void drawTriangle(
     int height,
     std::vector<int>& pixels,
     std::vector<float>& zBuffer,
-    const Texture& texture
+    const Texture& texture,
+    float shade
 ) {
     int minX = std::max(0, (int)std::floor(
         std::min({a.x, b.x, c.x})));
@@ -232,10 +239,11 @@ void drawTriangle(
             }
 
             // 1. 插值得到当前像素的深度
-            float z =
-                alpha * a.z +
-                beta  * b.z +
-                gamma * c.z;
+            const float reciprocalZ =
+                alpha / a.z +
+                beta  / b.z +
+                gamma / c.z;
+            const float z = 1.0f / reciprocalZ;
 
             int index = y * width + x;
 
@@ -246,21 +254,28 @@ void drawTriangle(
                 zBuffer[index] = z;
 
                 // 4. 插值得到当前像素的纹理坐标
-                float u = alpha * a.u
-                        + beta  * b.u
-                        + gamma * c.u;
+                float u = (
+                    alpha * a.u / a.z +
+                    beta  * b.u / b.z +
+                    gamma * c.u / c.z
+                ) / reciprocalZ;
 
-                float v = alpha * a.v
-                        + beta  * b.v
-                        + gamma * c.v;
+                float v = (
+                    alpha * a.v / a.z +
+                    beta  * b.v / b.z +
+                    gamma * c.v / c.z
+                ) / reciprocalZ;
 
                 // 5. 采样纹理颜色        
-                 Color color = texture.sample(u, v);
+                Color color = texture.sample(u, v);
 
-                //6.插值颜色更新颜色缓冲区
-                pixels[index * 3 + 0] = color.r;
-                pixels[index * 3 + 1] = color.g;
-                pixels[index * 3 + 2] = color.b;
+                // 6. 对不同面应用亮度差异，便于区分长方体的朝向
+                pixels[index * 3 + 0] = std::clamp(
+                    static_cast<int>(color.r * shade), 0, 255);
+                pixels[index * 3 + 1] = std::clamp(
+                    static_cast<int>(color.g * shade), 0, 255);
+                pixels[index * 3 + 2] = std::clamp(
+                    static_cast<int>(color.b * shade), 0, 255);
             }
         }
     }
@@ -293,52 +308,77 @@ int main() {
     // 创建深度缓冲区，初始化为最大值
     std::vector<float> zBuffer(width * height, std::numeric_limits<float>::max());
 
-    const Vertex localTriangle[] = {
-        {-1.0f, -1.0f, 0.0f, 0.0f, 0.0f},
-        { 1.0f, -1.0f, 0.0f, 1.0f, 0.0f},
-        { 0.0f,  1.0f, 0.0f, 0.5f, 1.0f}
+    constexpr float halfWidth = 1.0f;
+    constexpr float halfHeight = 0.75f;
+    constexpr float halfDepth = 0.7f;
+    const Vertex faces[6][4] = {
+        {
+            {-halfWidth, -halfHeight, -halfDepth, 0.0f, 1.0f},
+            { halfWidth, -halfHeight, -halfDepth, 1.0f, 1.0f},
+            { halfWidth,  halfHeight, -halfDepth, 1.0f, 0.0f},
+            {-halfWidth,  halfHeight, -halfDepth, 0.0f, 0.0f}
+        },
+        {
+            { halfWidth, -halfHeight, halfDepth, 0.0f, 1.0f},
+            {-halfWidth, -halfHeight, halfDepth, 1.0f, 1.0f},
+            {-halfWidth,  halfHeight, halfDepth, 1.0f, 0.0f},
+            { halfWidth,  halfHeight, halfDepth, 0.0f, 0.0f}
+        },
+        {
+            {-halfWidth, -halfHeight,  halfDepth, 0.0f, 1.0f},
+            {-halfWidth, -halfHeight, -halfDepth, 1.0f, 1.0f},
+            {-halfWidth,  halfHeight, -halfDepth, 1.0f, 0.0f},
+            {-halfWidth,  halfHeight,  halfDepth, 0.0f, 0.0f}
+        },
+        {
+            {halfWidth, -halfHeight, -halfDepth, 0.0f, 1.0f},
+            {halfWidth, -halfHeight,  halfDepth, 1.0f, 1.0f},
+            {halfWidth,  halfHeight,  halfDepth, 1.0f, 0.0f},
+            {halfWidth,  halfHeight, -halfDepth, 0.0f, 0.0f}
+        },
+        {
+            {-halfWidth, halfHeight, -halfDepth, 0.0f, 1.0f},
+            { halfWidth, halfHeight, -halfDepth, 1.0f, 1.0f},
+            { halfWidth, halfHeight,  halfDepth, 1.0f, 0.0f},
+            {-halfWidth, halfHeight,  halfDepth, 0.0f, 0.0f}
+        },
+        {
+            {-halfWidth, -halfHeight,  halfDepth, 0.0f, 1.0f},
+            { halfWidth, -halfHeight,  halfDepth, 1.0f, 1.0f},
+            { halfWidth, -halfHeight, -halfDepth, 1.0f, 0.0f},
+            {-halfWidth, -halfHeight, -halfDepth, 0.0f, 0.0f}
+        }
     };
+    const float faceShades[6] = {1.0f, 0.55f, 0.7f, 0.8f, 1.15f, 0.45f};
+    constexpr float rotationX = 0.35f;
+    constexpr float rotationY = 0.65f;
 
-    const float rotationY = 0.55f;
-    Vertex nearTriangle[3];
-    Vertex farTriangle[3];
+    // 旋转并放置长方体，然后对每个四边形面进行透视投影和光栅化。
+    for (int face = 0; face < 6; ++face) {
+        ScreenVertex screenVertices[4];
+        for (int i = 0; i < 4; ++i) {
+            Vertex worldVertex = rotateAndTranslate(
+                faces[face][i],
+                rotationX,
+                rotationY,
+                0.0f,
+                0.0f,
+                12.0f
+            );
+            screenVertices[i] = viewport.transform(
+                projection.project(worldVertex)
+            );
+        }
 
-    for (int i = 0; i < 3; ++i) {
-        nearTriangle[i] = rotateYAndTranslate(
-            localTriangle[i], rotationY, -1.3f, 0.0f, 3.2f
+        drawTriangle(
+            screenVertices[0], screenVertices[1], screenVertices[2],
+            width, height, pixels, zBuffer, texture, faceShades[face]
         );
-        farTriangle[i] = rotateYAndTranslate(
-            localTriangle[i], rotationY, 2.1f, 0.0f, 5.4f
+        drawTriangle(
+            screenVertices[0], screenVertices[2], screenVertices[3],
+            width, height, pixels, zBuffer, texture, faceShades[face]
         );
     }
-
-    // 1. 三维顶点 -> 透视投影
-    auto p0 = projection.project(nearTriangle[0]);
-    auto p1 = projection.project(nearTriangle[1]);
-    auto p2 = projection.project(nearTriangle[2]);
-
-    auto p3 = projection.project(farTriangle[0]);
-    auto p4 = projection.project(farTriangle[1]);
-    auto p5 = projection.project(farTriangle[2]);
-
-    // 2. 投影坐标 -> 屏幕像素坐标
-    auto s0 = viewport.transform(p0);
-    auto s1 = viewport.transform(p1);
-    auto s2 = viewport.transform(p2);
-    
-    auto s3 = viewport.transform(p3);
-    auto s4 = viewport.transform(p4);
-    auto s5 = viewport.transform(p5);
-
-
-    // 3. 交给原来的光栅化器
-    drawTriangle(s0, s1, s2, width, height, pixels, zBuffer, texture);
-    drawTriangle(s3, s4, s5, width, height, pixels, zBuffer, texture);
-
-   
-    //交换结果一样
-    //drawTriangle(a2, b2, c2, width, height, pixels, zBuffer);
-    //drawTriangle(a1, b1, c1, width, height, pixels, zBuffer);
 
     // 输出 PPM 图片
     std::ofstream file("triangle.ppm");
