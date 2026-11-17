@@ -280,6 +280,78 @@ void drawTriangle(
         }
     }
 }
+constexpr float NEAR_PLANE = 1.0f;
+bool isInsideNearPlane(const Vertex& v) {
+    return v.z >= NEAR_PLANE;
+}
+
+
+Vertex intersectNearPlane(
+    const Vertex& A,
+    const Vertex& B
+) {
+    // 计算交点在线段 AB 上的位置比例
+    float t = (NEAR_PLANE - A.z) / (B.z - A.z);
+
+    // 根据比例计算交点的三维坐标
+    Vertex P;
+
+    P.x = A.x + t * (B.x - A.x);
+    P.y = A.y + t * (B.y - A.y);
+    P.z = NEAR_PLANE;
+    P.u = A.u + t * (B.u - A.u);
+    P.v = A.v + t * (B.v - A.v);
+
+    return P;
+}
+
+// 三角形近裁剪
+std::vector<Vertex> clipTriangleNearPlane(
+    const std::vector<Vertex>& triangle
+) {
+    std::vector<Vertex> output;
+
+    // 必须是一个三角形
+    if (triangle.size() != 3) {
+        return output;
+    }
+
+    // 遍历三角形的三条边
+    for (size_t i = 0; i < triangle.size(); i++) {
+
+        const Vertex& A = triangle[i];
+        const Vertex& B = triangle[(i + 1) % triangle.size()];
+
+        bool insideA = isInsideNearPlane(A);
+        bool insideB = isInsideNearPlane(B);
+
+        if (insideA && insideB) {
+
+            // 内部 -> 内部
+            output.push_back(B);
+
+        } else if (insideA && !insideB) {
+
+            // 内部 -> 外部
+            Vertex P = intersectNearPlane(A, B);
+            output.push_back(P);
+
+        } else if (!insideA && insideB) {
+
+            // 外部 -> 内部
+            Vertex P = intersectNearPlane(A, B);
+            output.push_back(P);
+            output.push_back(B);
+
+        } else {
+
+            // 外部 -> 外部
+            // 不输出任何顶点
+        }
+    }
+
+    return output;
+}
 
 int main() {
     const float width = 800.0f;
@@ -354,29 +426,66 @@ int main() {
     constexpr float rotationY = 0.65f;
 
     // 旋转并放置长方体，然后对每个四边形面进行透视投影和光栅化。
-    for (int face = 0; face < 6; ++face) {
-        ScreenVertex screenVertices[4];
-        for (int i = 0; i < 4; ++i) {
-            Vertex worldVertex = rotateAndTranslate(
-                faces[face][i],
-                rotationX,
-                rotationY,
-                0.0f,
-                0.0f,
-                12.0f
-            );
-            screenVertices[i] = viewport.transform(
-                projection.project(worldVertex)
-            );
+    // for (int face = 0; face < 6; ++face) {
+    //     ScreenVertex screenVertices[4];
+    //     for (int i = 0; i < 4; ++i) {
+    //         Vertex worldVertex = rotateAndTranslate(
+    //             faces[face][i],
+    //             rotationX,
+    //             rotationY,
+    //             0.0f,
+    //             0.0f,
+    //             12.0f
+    //         );
+    //         screenVertices[i] = viewport.transform(
+    //             projection.project(worldVertex)
+    //         );
+    //     }
+
+    //     drawTriangle(
+    //         screenVertices[0], screenVertices[1], screenVertices[2],
+    //         width, height, pixels, zBuffer, texture, faceShades[face]
+    //     );
+    //     drawTriangle(
+    //         screenVertices[0], screenVertices[2], screenVertices[3],
+    //         width, height, pixels, zBuffer, texture, faceShades[face]
+    //     );
+    // }
+
+    auto renderClippedTriangle = [&](const Vertex& a, const Vertex& b, const Vertex& c,
+                                float shade) {
+        // 先变换到摄像机空间，再裁剪
+        std::vector<Vertex> triangle = {
+            rotateAndTranslate(a, rotationX, rotationY, 0.0f, 0.0f, 12.0f),
+            rotateAndTranslate(b, rotationX, rotationY, 0.0f, 0.0f, 12.0f),
+            rotateAndTranslate(c, rotationX, rotationY, 0.0f, 0.0f, 12.0f)
+        };
+
+        std::vector<Vertex> clipped = clipTriangleNearPlane(triangle);
+        if (clipped.size() < 3) return;
+
+        std::vector<ScreenVertex> screen;
+        for (const Vertex& v : clipped) {
+            screen.push_back(viewport.transform(projection.project(v)));
         }
 
-        drawTriangle(
-            screenVertices[0], screenVertices[1], screenVertices[2],
-            width, height, pixels, zBuffer, texture, faceShades[face]
+        // 裁剪结果是凸多边形，以第 0 个顶点为扇心三角化
+        for (size_t i = 1; i + 1 < screen.size(); ++i) {
+            drawTriangle(
+                screen[0], screen[i], screen[i + 1],
+                width, height, pixels, zBuffer, texture, shade
+            );
+        }
+    };
+
+    for (int face = 0; face < 6; ++face) {
+        renderClippedTriangle(
+            faces[face][0], faces[face][1], faces[face][2],
+            faceShades[face]
         );
-        drawTriangle(
-            screenVertices[0], screenVertices[2], screenVertices[3],
-            width, height, pixels, zBuffer, texture, faceShades[face]
+        renderClippedTriangle(
+            faces[face][0], faces[face][2], faces[face][3],
+            faceShades[face]
         );
     }
 
