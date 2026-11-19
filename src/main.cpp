@@ -10,6 +10,7 @@
 #include "Projection.h"
 #include "Viewport.h"
 #include "Matrix4.h"
+#include "ObjLoader.h"
 
 
 struct Point {
@@ -369,6 +370,13 @@ int main() {
         return -1;
     }
 
+    ObjMesh mesh;
+    std::string objError;
+    if (!loadObj("assets/model.obj", mesh, objError)) {
+        std::cerr << "OBJ load failed: " << objError << std::endl;
+        return 1;
+    }
+
     
 
     // 创建像素缓冲区，初始化为黑色
@@ -377,48 +385,30 @@ int main() {
     // 创建深度缓冲区，初始化为最大值
     std::vector<float> zBuffer(width * height, std::numeric_limits<float>::max());
 
-    constexpr float halfWidth = 1.0f;
-    constexpr float halfHeight = 0.75f;
-    constexpr float halfDepth = 0.7f;
-    const Vertex faces[6][4] = {
-        {
-            {-halfWidth, -halfHeight, -halfDepth, 0.0f, 1.0f},
-            { halfWidth, -halfHeight, -halfDepth, 1.0f, 1.0f},
-            { halfWidth,  halfHeight, -halfDepth, 1.0f, 0.0f},
-            {-halfWidth,  halfHeight, -halfDepth, 0.0f, 0.0f}
-        },
-        {
-            { halfWidth, -halfHeight, halfDepth, 0.0f, 1.0f},
-            {-halfWidth, -halfHeight, halfDepth, 1.0f, 1.0f},
-            {-halfWidth,  halfHeight, halfDepth, 1.0f, 0.0f},
-            { halfWidth,  halfHeight, halfDepth, 0.0f, 0.0f}
-        },
-        {
-            {-halfWidth, -halfHeight,  halfDepth, 0.0f, 1.0f},
-            {-halfWidth, -halfHeight, -halfDepth, 1.0f, 1.0f},
-            {-halfWidth,  halfHeight, -halfDepth, 1.0f, 0.0f},
-            {-halfWidth,  halfHeight,  halfDepth, 0.0f, 0.0f}
-        },
-        {
-            {halfWidth, -halfHeight, -halfDepth, 0.0f, 1.0f},
-            {halfWidth, -halfHeight,  halfDepth, 1.0f, 1.0f},
-            {halfWidth,  halfHeight,  halfDepth, 1.0f, 0.0f},
-            {halfWidth,  halfHeight, -halfDepth, 0.0f, 0.0f}
-        },
-        {
-            {-halfWidth, halfHeight, -halfDepth, 0.0f, 1.0f},
-            { halfWidth, halfHeight, -halfDepth, 1.0f, 1.0f},
-            { halfWidth, halfHeight,  halfDepth, 1.0f, 0.0f},
-            {-halfWidth, halfHeight,  halfDepth, 0.0f, 0.0f}
-        },
-        {
-            {-halfWidth, -halfHeight,  halfDepth, 0.0f, 1.0f},
-            { halfWidth, -halfHeight,  halfDepth, 1.0f, 1.0f},
-            { halfWidth, -halfHeight, -halfDepth, 1.0f, 0.0f},
-            {-halfWidth, -halfHeight, -halfDepth, 0.0f, 0.0f}
-        }
-    };
-    const float faceShades[6] = {1.0f, 0.55f, 0.7f, 0.8f, 1.15f, 0.45f};
+    float minX = std::numeric_limits<float>::max();
+    float minY = std::numeric_limits<float>::max();
+    float minZ = std::numeric_limits<float>::max();
+    float maxX = std::numeric_limits<float>::lowest();
+    float maxY = std::numeric_limits<float>::lowest();
+    float maxZ = std::numeric_limits<float>::lowest();
+    for (const Vertex& vertex : mesh.triangles) {
+        minX = std::min(minX, vertex.x); maxX = std::max(maxX, vertex.x);
+        minY = std::min(minY, vertex.y); maxY = std::max(maxY, vertex.y);
+        minZ = std::min(minZ, vertex.z); maxZ = std::max(maxZ, vertex.z);
+    }
+    const float centerX = (minX + maxX) * 0.5f;
+    const float centerY = (minY + maxY) * 0.5f;
+    const float centerZ = (minZ + maxZ) * 0.5f;
+    const float maxExtent = std::max({maxX - minX, maxY - minY, maxZ - minZ});
+    if (maxExtent <= 1e-6f) {
+        std::cerr << "OBJ model has zero size" << std::endl;
+        return 1;
+    }
+    for (Vertex& vertex : mesh.triangles) {
+        vertex.x = (vertex.x - centerX) / maxExtent * 2.0f;
+        vertex.y = (vertex.y - centerY) / maxExtent * 2.0f;
+        vertex.z = (vertex.z - centerZ) / maxExtent * 2.0f;
+    }
     constexpr float rotationX = 0.35f;
     constexpr float rotationY = 0.65f;
     // 列向量约定下，右侧变换先作用：先旋转，再平移。
@@ -499,14 +489,9 @@ int main() {
         }
     };
 
-    for (int face = 0; face < 6; ++face) {
+    for (size_t i = 0; i + 2 < mesh.triangles.size(); i += 3) {
         renderClippedTriangle(
-            faces[face][0], faces[face][1], faces[face][2],
-            faceShades[face]
-        );
-        renderClippedTriangle(
-            faces[face][0], faces[face][2], faces[face][3],
-            faceShades[face]
+            mesh.triangles[i], mesh.triangles[i + 1], mesh.triangles[i + 2], 1.0f
         );
     }
 

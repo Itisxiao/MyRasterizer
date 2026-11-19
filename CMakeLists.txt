@@ -7,7 +7,7 @@ project(renderStudy LANGUAGES CXX)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-add_executable(renderStudy src/main.cpp  src/Texture.cpp src/Projection.cpp src/Viewport.cpp src/Matrix4.cpp)
+add_executable(renderStudy src/main.cpp src/Texture.cpp src/Projection.cpp src/Viewport.cpp src/Matrix4.cpp src/ObjLoader.cpp)
 target_include_directories(renderStudy
     PRIVATE include third_party
 )
