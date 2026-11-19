@@ -91,6 +91,26 @@ Vertex transformVertex(
     };
 }
 
+bool isFrontFacingInViewSpace(const Vertex& a, const Vertex& b, const Vertex& c)
+{
+    const float abX = b.x - a.x;
+    const float abY = b.y - a.y;
+    const float abZ = b.z - a.z;
+    const float acX = c.x - a.x;
+    const float acY = c.y - a.y;
+    const float acZ = c.z - a.z;
+
+    const float normalX = abY * acZ - abZ * acY;
+    const float normalY = abZ * acX - abX * acZ;
+    const float normalZ = abX * acY - abY * acX;
+    const float centerX = (a.x + b.x + c.x) / 3.0f;
+    const float centerY = (a.y + b.y + c.y) / 3.0f;
+    const float centerZ = (a.z + b.z + c.z) / 3.0f;
+
+    // View Space 相机在原点；若法线朝向相机，点积应为正。
+    return normalX * -centerX + normalY * -centerY + normalZ * -centerZ > 0.0f;
+}
+
 void drawTriangle(
     const Vertex& a,
     const Vertex& b,
@@ -461,6 +481,10 @@ int main() {
 
         // 裁剪结果是凸多边形，以第 0 个顶点为扇心三角化
         for (size_t i = 1; i + 1 < screen.size(); ++i) {
+            // 在 View Space 判断朝向，跳过背向相机的三角形。
+            if (!isFrontFacingInViewSpace(clipped[0], clipped[i], clipped[i + 1])) {
+                continue;
+            }
             drawTriangle(
                 screen[0], screen[i], screen[i + 1],
                 width, height, pixels, zBuffer, texture, shade
