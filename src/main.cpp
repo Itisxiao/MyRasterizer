@@ -295,55 +295,54 @@ void drawTriangle(
 }
 constexpr float NEAR_PLANE = 1.0f;
 constexpr float FAR_PLANE = 100.0f;
-bool isInsideDepthRange(const Vertex& v) {
-    return v.z >= NEAR_PLANE && v.z <= FAR_PLANE;
-}
 
-Vertex intersectDepthPlane(
-    const Vertex& A,
-    const Vertex& B,
-    float planeZ
-) {
-    const float t = (planeZ - A.z) / (B.z - A.z);
-
-    Vertex P;
-
-    P.x = A.x + t * (B.x - A.x);
-    P.y = A.y + t * (B.y - A.y);
-    P.z = planeZ;
-    P.u = A.u + t * (B.u - A.u);
-    P.v = A.v + t * (B.v - A.v);
-
-    return P;
-}
-
-std::vector<Vertex> clipPolygonAgainstDepthPlane(
-    const std::vector<Vertex>& polygon,
-    float planeZ,
-    bool keepGreater
-) {
-    std::vector<Vertex> output;
-    if (polygon.empty()) return output;
-
-    for (size_t i = 0; i < polygon.size(); ++i) {
-        const Vertex& A = polygon[i];
-        const Vertex& B = polygon[(i + 1) % polygon.size()];
-        const bool insideA = keepGreater ? A.z >= planeZ : A.z <= planeZ;
-        const bool insideB = keepGreater ? B.z >= planeZ : B.z <= planeZ;
-
-        if (insideA && insideB) output.push_back(B);
-        else if (insideA && !insideB) output.push_back(intersectDepthPlane(A, B, planeZ));
-        else if (!insideA && insideB) {
-            output.push_back(intersectDepthPlane(A, B, planeZ));
-            output.push_back(B);
-        }
+float clipDistance(const ClipVertex& v, int plane) {
+    switch (plane) {
+        case 0: return v.x + v.w; // left:   x >= -w
+        case 1: return v.w - v.x; // right:  x <=  w
+        case 2: return v.y + v.w; // bottom: y >= -w
+        case 3: return v.w - v.y; // top:    y <=  w
+        case 4: return v.z + v.w; // near:   z >= -w
+        default:return v.w - v.z; // far:    z <=  w
     }
-    return output;
 }
 
-std::vector<Vertex> clipTriangleDepthRange(const std::vector<Vertex>& triangle) {
-    auto clipped = clipPolygonAgainstDepthPlane(triangle, NEAR_PLANE, true);
-    return clipPolygonAgainstDepthPlane(clipped, FAR_PLANE, false);
+ClipVertex interpolateClipVertex(const ClipVertex& a, const ClipVertex& b, float t) {
+    return {
+        a.x + (b.x - a.x) * t,
+        a.y + (b.y - a.y) * t,
+        a.z + (b.z - a.z) * t,
+        a.w + (b.w - a.w) * t,
+        a.viewZ + (b.viewZ - a.viewZ) * t,
+        a.u + (b.u - a.u) * t,
+        a.v + (b.v - a.v) * t
+    };
+}
+
+std::vector<ClipVertex> clipPolygonHomogeneous(std::vector<ClipVertex> polygon) {
+    for (int plane = 0; plane < 6 && !polygon.empty(); ++plane) {
+        std::vector<ClipVertex> output;
+        for (size_t i = 0; i < polygon.size(); ++i) {
+            const ClipVertex& a = polygon[i];
+            const ClipVertex& b = polygon[(i + 1) % polygon.size()];
+            const float distanceA = clipDistance(a, plane);
+            const float distanceB = clipDistance(b, plane);
+            const bool insideA = distanceA >= 0.0f;
+            const bool insideB = distanceB >= 0.0f;
+
+            if (insideA && insideB) output.push_back(b);
+            else if (insideA && !insideB) {
+                const float t = distanceA / (distanceA - distanceB);
+                output.push_back(interpolateClipVertex(a, b, t));
+            } else if (!insideA && insideB) {
+                const float t = distanceA / (distanceA - distanceB);
+                output.push_back(interpolateClipVertex(a, b, t));
+                output.push_back(b);
+            }
+        }
+        polygon = std::move(output);
+    }
+    return polygon;
 }
 
 int main() {
@@ -471,18 +470,26 @@ int main() {
             transformVertex(c, modelViewMatrix)
         };
 
-        std::vector<Vertex> clipped = clipTriangleDepthRange(triangle);
+        // Homogeneous clipping 在透视除法之前对完整视锥进行裁剪。
+        std::vector<ClipVertex> clipPolygon;
+        clipPolygon.reserve(triangle.size());
+        for (const Vertex& v : triangle) {
+            clipPolygon.push_back(projection.toClipSpace(v, projectionMatrix));
+        }
+        std::vector<ClipVertex> clipped = clipPolygonHomogeneous(std::move(clipPolygon));
         if (clipped.size() < 3) return;
 
         std::vector<ScreenVertex> screen;
-        for (const Vertex& v : clipped) {
-            screen.push_back(viewport.transform(projection.project(v, projectionMatrix)));
+        screen.reserve(clipped.size());
+        for (const ClipVertex& v : clipped) {
+            screen.push_back(viewport.transform(projection.perspectiveDivide(v)));
         }
 
         // 裁剪结果是凸多边形，以第 0 个顶点为扇心三角化
         for (size_t i = 1; i + 1 < screen.size(); ++i) {
             // 在 View Space 判断朝向，跳过背向相机的三角形。
-            if (!isFrontFacingInViewSpace(clipped[0], clipped[i], clipped[i + 1])) {
+            // 维持 Back-face Culling 在 View Space 进行。
+            if (!isFrontFacingInViewSpace(triangle[0], triangle[1], triangle[2])) {
                 continue;
             }
             drawTriangle(
