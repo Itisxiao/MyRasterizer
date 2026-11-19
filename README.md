@@ -1,16 +1,20 @@
 # MyRasterizer
 
-一个使用 C++17 编写的软件光栅化学习项目。程序将纹理映射到经过旋转的长方体上，通过透视投影和深度测试生成 PPM 图片。
+一个使用 C++17 编写的软件光栅化学习项目。程序通过模型变换摆放并旋转长方体，将其裁剪、透视投影并光栅化，最终生成 PPM 图片。
 
 ## 当前功能
 
-- 将长方体拆分为三角形面片，并使用重心坐标进行光栅化
-- 将长方体绕 X、Y 轴旋转，再进行透视投影
-- 使用透视校正插值纹理坐标和深度
+- 使用 4×4 模型矩阵进行缩放、绕 X/Y 轴旋转和平移
+- 将长方体的 6 个四边形面拆分为三角形，并使用重心坐标进行光栅化
+- 对穿过近裁剪面的三角形进行裁剪
+- 通过透视投影将相机空间顶点映射到屏幕
+- 使用透视校正插值纹理坐标，并插值深度
 - 使用 Z 缓冲进行深度测试（深度值越小越靠近相机）
 - 对不同朝向的面应用亮度差异，便于观察长方体结构
 - 使用捆绑的 `stb_image` 从 `assets/test.png` 加载纹理
 - 将渲染结果写入 ASCII PPM（P3）格式的 `triangle.ppm`
+
+当前相机固定在原点并朝 `+Z` 方向观察；场景中的长方体通过模型矩阵变换到相机前方。
 
 ## 环境要求
 
@@ -46,7 +50,7 @@ cmake --build build && ./build/renderStudy
 
 ```bash
 c++ -std=c++17 -Iinclude -Ithird_party \
-  src/main.cpp src/Texture.cpp src/Projection.cpp src/Viewport.cpp \
+  src/main.cpp src/Texture.cpp src/Projection.cpp src/Viewport.cpp src/Matrix4.cpp \
   -o renderStudy
 ./renderStudy
 ```
@@ -70,6 +74,7 @@ cmake -S . -B build
 │   └── test.png
 ├── include/
 │   ├── Color.h
+│   ├── Matrix4.h
 │   ├── Projection.h
 │   ├── ScreenVertex.h
 │   ├── Texture.h
@@ -77,6 +82,7 @@ cmake -S . -B build
 │   └── Viewport.h
 ├── src/
 │   ├── main.cpp
+│   ├── Matrix4.cpp
 │   ├── Projection.cpp
 │   ├── Texture.cpp
 │   └── Viewport.cpp
