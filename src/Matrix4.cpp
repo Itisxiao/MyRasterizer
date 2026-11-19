@@ -48,6 +48,15 @@ Matrix4 Matrix4::translation(float x, float y, float z)
     return result;
 }
 
+Matrix4 Matrix4::scale(float scaleX, float scaleY, float scaleZ)
+{
+    Matrix4 result = identity();
+    result.m[0][0] = scaleX;
+    result.m[1][1] = scaleY;
+    result.m[2][2] = scaleZ;
+    return result;
+}
+
 //列向量约定：矩阵乘向量时，矩阵放左边
 Vector4 Matrix4::operator*(const Vector4& v) const
 {

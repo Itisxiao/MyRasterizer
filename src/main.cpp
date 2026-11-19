@@ -419,9 +419,10 @@ int main() {
     constexpr float rotationY = 0.65f;
     // 列向量约定下，右侧变换先作用：先旋转，再平移。
     const Matrix4 modelMatrix =
-        Matrix4::translation(0.0f, 0.0f, 4.0f)
+        Matrix4::translation(0.0f, 0.0f, 12.0f)
         * Matrix4::rotationY(rotationY)
-        * Matrix4::rotationX(rotationX);
+        * Matrix4::rotationX(rotationX)
+        * Matrix4::scale(1.5f, 1.5f, 1.5f);
 
     // 旋转并放置长方体，然后对每个四边形面进行透视投影和光栅化。
     // for (int face = 0; face < 6; ++face) {
