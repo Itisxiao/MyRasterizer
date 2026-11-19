@@ -76,9 +76,9 @@ bool barycentric(
 
 Vertex transformVertex(
     const Vertex& vertex,
-    const Matrix4& modelMatrix
+    const Matrix4& modelViewMatrix
 ) {
-    const Vector4 transformed = modelMatrix * Vector4{
+    const Vector4 transformed = modelViewMatrix * Vector4{
         vertex.x, vertex.y, vertex.z, 1.0f
     };
 
@@ -423,6 +423,12 @@ int main() {
         * Matrix4::rotationY(rotationY)
         * Matrix4::rotationX(rotationX)
         * Matrix4::scale(1.5f, 1.5f, 1.5f);
+    const Matrix4 viewMatrix = Matrix4::lookAt(
+        {0.0f, 0.0f, 0.0f, 1.0f}, // 摄像机位置
+        {0.0f, 0.0f, 1.0f, 1.0f}, // 观察目标：朝 +Z
+        {0.0f, 1.0f, 0.0f, 0.0f}  // 世界上方向
+    );
+    const Matrix4 modelViewMatrix = viewMatrix * modelMatrix;
 
     // 旋转并放置长方体，然后对每个四边形面进行透视投影和光栅化。
     // for (int face = 0; face < 6; ++face) {
@@ -455,9 +461,9 @@ int main() {
                                 float shade) {
         // 先变换到摄像机空间，再裁剪
         std::vector<Vertex> triangle = {
-            transformVertex(a, modelMatrix),
-            transformVertex(b, modelMatrix),
-            transformVertex(c, modelMatrix)
+            transformVertex(a, modelViewMatrix),
+            transformVertex(b, modelViewMatrix),
+            transformVertex(c, modelViewMatrix)
         };
 
         std::vector<Vertex> clipped = clipTriangleNearPlane(triangle);

@@ -1,6 +1,28 @@
 
 #include "Matrix4.h"
 #include <cmath>
+#include <stdexcept>
+
+namespace {
+Vector4 normalize3(const Vector4& v)
+{
+    const float length = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+    if (length < 1e-6f) throw std::invalid_argument("lookAt direction must be non-zero");
+    return {v.x / length, v.y / length, v.z / length, 0.0f};
+}
+
+Vector4 cross3(const Vector4& a, const Vector4& b)
+{
+    return {a.y * b.z - a.z * b.y,
+            a.z * b.x - a.x * b.z,
+            a.x * b.y - a.y * b.x, 0.0f};
+}
+
+float dot3(const Vector4& a, const Vector4& b)
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+}
 
 
 Matrix4 Matrix4::identity()
@@ -54,6 +76,23 @@ Matrix4 Matrix4::scale(float scaleX, float scaleY, float scaleZ)
     result.m[0][0] = scaleX;
     result.m[1][1] = scaleY;
     result.m[2][2] = scaleZ;
+    return result;
+}
+
+Matrix4 Matrix4::lookAt(const Vector4& eye, const Vector4& target, const Vector4& up)
+{
+    const Vector4 forward = normalize3({target.x - eye.x, target.y - eye.y,
+                                        target.z - eye.z, 0.0f});
+    const Vector4 right = normalize3(cross3(up, forward));
+    const Vector4 cameraUp = cross3(forward, right);
+
+    Matrix4 result = identity();
+    result.m[0][0] = right.x;    result.m[0][1] = right.y;    result.m[0][2] = right.z;
+    result.m[1][0] = cameraUp.x; result.m[1][1] = cameraUp.y; result.m[1][2] = cameraUp.z;
+    result.m[2][0] = forward.x;  result.m[2][1] = forward.y;  result.m[2][2] = forward.z;
+    result.m[0][3] = -dot3(right, eye);
+    result.m[1][3] = -dot3(cameraUp, eye);
+    result.m[2][3] = -dot3(forward, eye);
     return result;
 }
 
