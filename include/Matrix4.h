@@ -12,6 +12,8 @@ struct Matrix4 {
     static Matrix4 rotationY(float radians);
     static Matrix4 translation(float x, float y, float z);
     static Matrix4 scale(float scaleX, float scaleY, float scaleZ);
+    static Matrix4 perspective(float verticalFovRadians, float aspectRatio,
+                               float nearPlane, float farPlane);
     // 相机朝向 +Z，符合当前 Projection 的正 Z 前向约定。
     static Matrix4 lookAt(const Vector4& eye, const Vector4& target, const Vector4& up);
 

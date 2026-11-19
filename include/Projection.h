@@ -3,16 +3,18 @@
 
 #include "Vertex.h"
 #include "ScreenVertex.h"
+#include "Matrix4.h"
 
 class Projection {
 public:
-    Projection(float width, float height, float fov);
+    Projection(float width, float height, float fovDegrees,
+               float nearPlane, float farPlane);
 
-    ScreenVertex project(const Vertex& vertex) const;
+    ScreenVertex project(const Vertex& vertex, const Matrix4& projectionMatrix) const;
 
 private:
     float width;
     float height;
-    float fov;
-    float focalLength;
+    float nearPlane;
+    float farPlane;
 };

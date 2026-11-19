@@ -274,76 +274,56 @@ void drawTriangle(
     }
 }
 constexpr float NEAR_PLANE = 1.0f;
-bool isInsideNearPlane(const Vertex& v) {
-    return v.z >= NEAR_PLANE;
+constexpr float FAR_PLANE = 100.0f;
+bool isInsideDepthRange(const Vertex& v) {
+    return v.z >= NEAR_PLANE && v.z <= FAR_PLANE;
 }
 
-
-Vertex intersectNearPlane(
+Vertex intersectDepthPlane(
     const Vertex& A,
-    const Vertex& B
+    const Vertex& B,
+    float planeZ
 ) {
-    // 计算交点在线段 AB 上的位置比例
-    float t = (NEAR_PLANE - A.z) / (B.z - A.z);
+    const float t = (planeZ - A.z) / (B.z - A.z);
 
-    // 根据比例计算交点的三维坐标
     Vertex P;
 
     P.x = A.x + t * (B.x - A.x);
     P.y = A.y + t * (B.y - A.y);
-    P.z = NEAR_PLANE;
+    P.z = planeZ;
     P.u = A.u + t * (B.u - A.u);
     P.v = A.v + t * (B.v - A.v);
 
     return P;
 }
 
-// 三角形近裁剪
-std::vector<Vertex> clipTriangleNearPlane(
-    const std::vector<Vertex>& triangle
+std::vector<Vertex> clipPolygonAgainstDepthPlane(
+    const std::vector<Vertex>& polygon,
+    float planeZ,
+    bool keepGreater
 ) {
     std::vector<Vertex> output;
+    if (polygon.empty()) return output;
 
-    // 必须是一个三角形
-    if (triangle.size() != 3) {
-        return output;
-    }
+    for (size_t i = 0; i < polygon.size(); ++i) {
+        const Vertex& A = polygon[i];
+        const Vertex& B = polygon[(i + 1) % polygon.size()];
+        const bool insideA = keepGreater ? A.z >= planeZ : A.z <= planeZ;
+        const bool insideB = keepGreater ? B.z >= planeZ : B.z <= planeZ;
 
-    // 遍历三角形的三条边
-    for (size_t i = 0; i < triangle.size(); i++) {
-
-        const Vertex& A = triangle[i];
-        const Vertex& B = triangle[(i + 1) % triangle.size()];
-
-        bool insideA = isInsideNearPlane(A);
-        bool insideB = isInsideNearPlane(B);
-
-        if (insideA && insideB) {
-
-            // 内部 -> 内部
+        if (insideA && insideB) output.push_back(B);
+        else if (insideA && !insideB) output.push_back(intersectDepthPlane(A, B, planeZ));
+        else if (!insideA && insideB) {
+            output.push_back(intersectDepthPlane(A, B, planeZ));
             output.push_back(B);
-
-        } else if (insideA && !insideB) {
-
-            // 内部 -> 外部
-            Vertex P = intersectNearPlane(A, B);
-            output.push_back(P);
-
-        } else if (!insideA && insideB) {
-
-            // 外部 -> 内部
-            Vertex P = intersectNearPlane(A, B);
-            output.push_back(P);
-            output.push_back(B);
-
-        } else {
-
-            // 外部 -> 外部
-            // 不输出任何顶点
         }
     }
-
     return output;
+}
+
+std::vector<Vertex> clipTriangleDepthRange(const std::vector<Vertex>& triangle) {
+    auto clipped = clipPolygonAgainstDepthPlane(triangle, NEAR_PLANE, true);
+    return clipPolygonAgainstDepthPlane(clipped, FAR_PLANE, false);
 }
 
 int main() {
@@ -351,7 +331,12 @@ int main() {
     const float height = 600.0f;
 
     // 创建投影器：垂直视场角 60 度
-    Projection projection(width, height, 60.0f);
+    Projection projection(width, height, 60.0f, NEAR_PLANE, FAR_PLANE);
+    const float aspectRatio = width / height;
+    const float fovRadians = 60.0f * 3.14159265358979323846f / 180.0f;
+    const Matrix4 projectionMatrix = Matrix4::perspective(
+        fovRadians, aspectRatio, NEAR_PLANE, FAR_PLANE
+    );
 
     // 创建视口
     Viewport viewport(width, height);
@@ -466,12 +451,12 @@ int main() {
             transformVertex(c, modelViewMatrix)
         };
 
-        std::vector<Vertex> clipped = clipTriangleNearPlane(triangle);
+        std::vector<Vertex> clipped = clipTriangleDepthRange(triangle);
         if (clipped.size() < 3) return;
 
         std::vector<ScreenVertex> screen;
         for (const Vertex& v : clipped) {
-            screen.push_back(viewport.transform(projection.project(v)));
+            screen.push_back(viewport.transform(projection.project(v, projectionMatrix)));
         }
 
         // 裁剪结果是凸多边形，以第 0 个顶点为扇心三角化

@@ -79,6 +79,25 @@ Matrix4 Matrix4::scale(float scaleX, float scaleY, float scaleZ)
     return result;
 }
 
+Matrix4 Matrix4::perspective(float verticalFovRadians, float aspectRatio,
+                             float nearPlane, float farPlane)
+{
+    if (verticalFovRadians <= 0.0f || verticalFovRadians >= 3.14159265f ||
+        aspectRatio <= 0.0f || nearPlane <= 0.0f || farPlane <= nearPlane) {
+        throw std::invalid_argument("Invalid perspective projection parameters");
+    }
+
+    const float focal = 1.0f / std::tan(verticalFovRadians * 0.5f);
+    Matrix4 result{};
+    result.m[0][0] = focal / aspectRatio;
+    result.m[1][1] = focal;
+    // Right-handed algebra with +Z forward: NDC z maps near->-1 and far->+1.
+    result.m[2][2] = (farPlane + nearPlane) / (farPlane - nearPlane);
+    result.m[2][3] = -2.0f * farPlane * nearPlane / (farPlane - nearPlane);
+    result.m[3][2] = 1.0f;
+    return result;
+}
+
 Matrix4 Matrix4::lookAt(const Vector4& eye, const Vector4& target, const Vector4& up)
 {
     const Vector4 forward = normalize3({target.x - eye.x, target.y - eye.y,
