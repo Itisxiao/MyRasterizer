@@ -9,6 +9,7 @@
 #include "Vertex.h"
 #include "Projection.h"
 #include "Viewport.h"
+#include "Matrix4.h"
 
 
 struct Point {
@@ -73,26 +74,18 @@ bool barycentric(
     return alpha >= 0 && beta >= 0 && gamma >= 0;
 }
 
-Vertex rotateAndTranslate(
+Vertex transformVertex(
     const Vertex& vertex,
-    float rotationX,
-    float rotationY,
-    float translateX,
-    float translateY,
-    float translateZ
+    const Matrix4& modelMatrix
 ) {
-    const float cosX = std::cos(rotationX);
-    const float sinX = std::sin(rotationX);
-    const float cosY = std::cos(rotationY);
-    const float sinY = std::sin(rotationY);
-
-    const float rotatedY = cosX * vertex.y - sinX * vertex.z;
-    const float rotatedZ = sinX * vertex.y + cosX * vertex.z;
+    const Vector4 transformed = modelMatrix * Vector4{
+        vertex.x, vertex.y, vertex.z, 1.0f
+    };
 
     return {
-        cosY * vertex.x + sinY * rotatedZ + translateX,
-        rotatedY + translateY,
-        -sinY * vertex.x + cosY * rotatedZ + translateZ,
+        transformed.x,
+        transformed.y,
+        transformed.z,
         vertex.u,
         vertex.v
     };
@@ -424,6 +417,11 @@ int main() {
     const float faceShades[6] = {1.0f, 0.55f, 0.7f, 0.8f, 1.15f, 0.45f};
     constexpr float rotationX = 0.35f;
     constexpr float rotationY = 0.65f;
+    // 列向量约定下，右侧变换先作用：先旋转，再平移。
+    const Matrix4 modelMatrix =
+        Matrix4::translation(0.0f, 0.0f, 4.0f)
+        * Matrix4::rotationY(rotationY)
+        * Matrix4::rotationX(rotationX);
 
     // 旋转并放置长方体，然后对每个四边形面进行透视投影和光栅化。
     // for (int face = 0; face < 6; ++face) {
@@ -456,9 +454,9 @@ int main() {
                                 float shade) {
         // 先变换到摄像机空间，再裁剪
         std::vector<Vertex> triangle = {
-            rotateAndTranslate(a, rotationX, rotationY, 0.0f, 0.0f, 12.0f),
-            rotateAndTranslate(b, rotationX, rotationY, 0.0f, 0.0f, 12.0f),
-            rotateAndTranslate(c, rotationX, rotationY, 0.0f, 0.0f, 12.0f)
+            transformVertex(a, modelMatrix),
+            transformVertex(b, modelMatrix),
+            transformVertex(c, modelMatrix)
         };
 
         std::vector<Vertex> clipped = clipTriangleNearPlane(triangle);
